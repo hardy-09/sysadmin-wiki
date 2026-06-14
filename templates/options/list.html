@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}选项管理 — SysAdmin Wiki{% endblock %}
+
+{% block extra_style %}
+.opt-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:16px}
+.opt-title{font-weight:700;font-size:.9rem;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.opt-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;min-height:32px}
+.opt-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 12px;
+  border-radius:20px;font-size:.8rem;font-weight:500;
+  background:var(--tag-bg);border:1px solid var(--tag-border);color:var(--tag-text)}
+.opt-chip-del{display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:50%;border:none;background:none;
+  color:var(--text-muted);cursor:pointer;padding:0;font-size:.75rem;line-height:1;
+  transition:background .1s,color .1s}
+.opt-chip-del:hover{background:rgba(220,38,38,.12);color:#dc2626}
+.opt-add{display:flex;gap:8px}
+.opt-add input{flex:1;border:1px solid var(--border);border-radius:8px;
+  padding:6px 12px;font-size:.85rem;background:var(--input-bg);color:var(--text)}
+.opt-add input:focus{outline:none;border-color:var(--accent)}
+.opt-empty{font-size:.8rem;color:var(--text-muted);font-style:italic}
+{% endblock %}
+
+{% block content %}
+<div style="max-width:620px;margin:0 auto">
+  <h5 style="font-weight:700;margin-bottom:4px">选项管理</h5>
+  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:24px">
+    管理密码条目中分类、地区、类型的下拉选项。删除选项不影响已有数据行的值。
+  </p>
+
+  {% set sections = [
+    ('category', '分类', 'bi-folder', cats),
+    ('region',   '地区', 'bi-geo-alt', regs),
+    ('conn_type','类型', 'bi-plug', types),
+  ] %}
+
+  {% for opt_type, label, icon, items in sections %}
+  <div class="opt-section">
+    <div class="opt-title">
+      <i class="bi {{ icon }}"></i>{{ label }}
+      <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">{{ items|length }} 个选项</span>
+    </div>
+    <div class="opt-chips">
+      {% if items %}
+        {% for opt in items %}
+        <span class="opt-chip">
+          {{ opt.value }}
+          <form method="post" action="{{ url_for('option_delete', id=opt.id) }}" style="display:inline;margin:0">
+            <button class="opt-chip-del" title="删除" onclick="return confirm('删除「{{ opt.value }}」选项？\n已有数据行的值不受影响')">
+              <i class="bi bi-x"></i>
+            </button>
+          </form>
+        </span>
+        {% endfor %}
+      {% else %}
+        <span class="opt-empty">暂无选项</span>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('option_add') }}" class="opt-add">
+      <input type="hidden" name="opt_type" value="{{ opt_type }}">
+      <input type="text" name="value" placeholder="输入新{{ label }}，回车添加" maxlength="50">
+      <button class="btn-primary-flat" style="font-size:.8rem;padding:6px 14px;white-space:nowrap">添加</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

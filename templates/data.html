@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}数据导入导出 — SysAdmin Wiki{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">首页</a></li>
+<li class="breadcrumb-item active">数据导入导出</li>
+{% endblock %}
+
+{% block extra_style %}
+.data-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px}
+.data-card h6{font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px}
+.stat-pill{display:inline-flex;align-items:center;gap:6px;background:var(--accent-light);color:var(--accent);
+  border:1px solid var(--accent-border);border-radius:20px;padding:4px 14px;font-size:.82rem;font-weight:600;margin-bottom:16px}
+.action-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.action-row:last-child{border-bottom:none;padding-bottom:0}
+.action-row:first-child{padding-top:0}
+.action-desc{font-size:.82rem;color:var(--text-muted);margin-top:2px}
+{% endblock %}
+
+{% block content %}
+<div class="ph">
+  <div><h4>数据导入导出</h4><div class="ph-sub">仅 admin 可操作，导出密码为明文 JSON，请妥善保管</div></div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ 'success' if cat == 'success' else 'danger' }} py-2 mb-3" style="font-size:.875rem">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
+
+<!-- 密码库 -->
+<div class="data-card">
+  <h6><i class="bi bi-shield-lock me-2"></i>密码库</h6>
+  <div class="stat-pill"><i class="bi bi-database"></i>{{ pw_count }} 条记录</div>
+
+  <div class="action-row">
+    <div>
+      <div style="font-weight:500;font-size:.9rem">导出密码</div>
+      <div class="action-desc">将所有密码以 JSON 格式下载到本地（含明文密码）</div>
+    </div>
+    <a href="{{ url_for('export_passwords') }}" class="btn-primary-flat" style="padding:6px 18px;font-size:.85rem;white-space:nowrap">
+      <i class="bi bi-download me-1"></i>导出 JSON
+    </a>
+  </div>
+
+  <div class="action-row">
+    <div>
+      <div style="font-weight:500;font-size:.9rem">导入密码</div>
+      <div class="action-desc">从之前导出的 JSON 文件导入，重复记录会追加</div>
+    </div>
+    <form method="post" action="{{ url_for('import_passwords') }}" enctype="multipart/form-data"
+          style="display:flex;gap:8px;align-items:center">
+      <label style="cursor:pointer">
+        <input type="file" name="file" accept=".json" style="display:none" onchange="this.form.submit()">
+        <span class="btn-flat" style="padding:6px 18px;font-size:.85rem;white-space:nowrap">
+          <i class="bi bi-upload me-1"></i>选择文件导入
+        </span>
+      </label>
+    </form>
+  </div>
+
+  <div class="action-row">
+    <div>
+      <div style="font-weight:500;font-size:.9rem">导出 Excel</div>
+      <div class="action-desc">将所有密码导出为 .xlsx 文件（含明文密码）</div>
+    </div>
+    <a href="{{ url_for('passwords_export_xlsx') }}" class="btn-flat" style="padding:6px 18px;font-size:.85rem;white-space:nowrap">
+      <i class="bi bi-file-earmark-excel me-1"></i>导出 Excel
+    </a>
+  </div>
+
+  <div class="action-row">
+    <div>
+      <div style="font-weight:500;font-size:.9rem">导入 Excel</div>
+      <div class="action-desc">从同格式 .xlsx 文件导入，密码加密存储，重复记录会追加</div>
+    </div>
+    <label style="cursor:pointer">
+      <input type="file" accept=".xlsx" style="display:none" onchange="doXlsxImport(this)">
+      <span class="btn-flat" style="padding:6px 18px;font-size:.85rem;white-space:nowrap">
+        <i class="bi bi-file-earmark-arrow-up me-1"></i>选择文件导入
+      </span>
+    </label>
+  </div>
+</div>
+
+<!-- 笔记 -->
+<div class="data-card">
+  <h6><i class="bi bi-journal-text me-2"></i>笔记</h6>
+  <div class="stat-pill"><i class="bi bi-database"></i>{{ note_count }} 条记录</div>
+
+  <div class="action-row">
+    <div>
+      <div style="font-weight:500;font-size:.9rem">导出笔记</div>
+      <div class="action-desc">JSON 保留层级结构可再导入；MD / TXT 供直接阅读</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <a href="{{ url_for('export_notes') }}" class="btn-flat" style="padding:6px 14px;font-size:.85rem;white-space:nowrap">
+        <i class="bi bi-download me-1"></i>JSON
+      </a>
+      <a href="{{ url_for('export_notes_md') }}" class="btn-flat" style="padding:6px 14px;font-size:.85rem;white-space:nowrap">
+        <i class="bi bi-markdown me-1"></i>MD
+      </a>
+      <a href="{{ url_for('export_notes_txt') }}" class="btn-primary-flat" style="padding:6px 14px;font-size:.85rem;white-space:nowrap">
+        <i class="bi bi-file-text me-1"></i>TXT
+      </a>
+    </div>
+  </div>
+
+  <div class="action-row">
+    <div>
+      <div style="font-weight:500;font-size:.9rem">导入笔记</div>
+      <div class="action-desc">JSON 还原层级结构；MD 支持多文件，文件名作为标题</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <form method="post" action="{{ url_for('import_notes') }}" enctype="multipart/form-data">
+        <label style="cursor:pointer">
+          <input type="file" name="file" accept=".json" style="display:none" onchange="this.form.submit()">
+          <span class="btn-flat" style="padding:6px 14px;font-size:.85rem;white-space:nowrap">
+            <i class="bi bi-upload me-1"></i>JSON
+          </span>
+        </label>
+      </form>
+      <form method="post" action="{{ url_for('import_notes_md') }}" enctype="multipart/form-data">
+        <label style="cursor:pointer">
+          <input type="file" name="file" accept=".md" multiple style="display:none" onchange="this.form.submit()">
+          <span class="btn-flat" style="padding:6px 14px;font-size:.85rem;white-space:nowrap">
+            <i class="bi bi-markdown me-1"></i>MD
+          </span>
+        </label>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+async function doXlsxImport(input) {
+  const file = input.files[0]; input.value = ''
+  if (!file) return
+  const fd = new FormData(); fd.append('file', file)
+  const r = await fetch('/passwords/import/xlsx', {method:'POST', body:fd})
+  const j = await r.json()
+  if (j.error) { alert('导入失败：' + j.error); return }
+  alert('成功导入 ' + j.added + ' 条记录')
+  location.reload()
+}
+</script>
+{% endblock %}

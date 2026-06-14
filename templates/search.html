@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}搜索: {{ q }}{% endblock %}
+
+{% block content %}
+<div class="ph">
+  <div><h4>搜索结果</h4><div class="ph-sub">"{{ q }}"</div></div>
+</div>
+
+{% if passwords %}
+<h6 style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">
+  <i class="bi bi-shield-lock me-1"></i>密码 ({{ passwords|length }})</h6>
+<div class="fc mb-4">
+  {% for pw in passwords %}
+  <div class="note-row">
+    <div class="flex-grow-1">
+      <a href="{{ url_for('password_view', id=pw.id) }}"
+         class="nr-title">{{ pw.name }}</a>
+      <div class="nr-meta">{{ pw.host }}{% if pw.username %} · {{ pw.username }}{% endif %}</div>
+    </div>
+    <span class="tag">{{ pw.category }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if notes %}
+<h6 style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">
+  <i class="bi bi-journal-text me-1"></i>笔记 ({{ notes|length }})</h6>
+<div class="fc mb-4">
+  {% for note in notes %}
+  <div class="note-row">
+    <div class="flex-grow-1">
+      <a href="{{ url_for('notes_main') }}?id={{ note.id }}"
+         class="nr-title">{{ note.title }}</a>
+      {% if note.content %}
+      <div class="nr-meta" style="max-width:500px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
+        {{ note.content[:120] | replace('\n',' ') }}
+      </div>
+      {% endif %}
+    </div>
+    <span style="font-size:.72rem;color:var(--text-muted)">{{ note.updated_at.strftime('%m-%d %H:%M') }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if not passwords and not notes %}
+<div class="text-center py-5" style="color:var(--text-muted)">
+  <i class="bi bi-search" style="font-size:2rem"></i>
+  <p class="mt-2">没有找到 "{{ q }}" 的相关内容</p>
+</div>
+{% endif %}
+{% endblock %}

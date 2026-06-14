@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}用户管理 — SysAdmin Wiki{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h5 class="mb-0 fw-bold">用户管理</h5>
+  <a href="{{ url_for('user_new') }}" class="btn-primary-flat">
+    <i class="bi bi-person-plus me-1"></i>新建用户</a>
+</div>
+
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+  <table class="table table-hover align-middle mb-0" style="font-size:.875rem">
+    <thead style="background:var(--surface2);border-bottom:1px solid var(--border)">
+      <tr>
+        <th style="padding:12px 20px;font-weight:600;color:var(--text-muted)">用户名</th>
+        <th style="padding:12px 20px;font-weight:600;color:var(--text-muted)">权限</th>
+        <th style="padding:12px 20px;font-weight:600;color:var(--text-muted)">状态</th>
+        <th style="padding:12px 20px;font-weight:600;color:var(--text-muted)">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td style="padding:12px 20px">
+          <i class="bi bi-person-circle me-2" style="color:var(--text-muted)"></i>
+          <strong>{{ u.username }}</strong>
+        </td>
+        <td style="padding:12px 20px">
+          {% if u.is_admin %}
+            <span class="tag" style="background:var(--accent-light);color:var(--accent);border-color:var(--accent-border)">
+              <i class="bi bi-shield-fill me-1"></i>管理员</span>
+          {% else %}
+            <span class="tag">普通用户</span>
+          {% endif %}
+        </td>
+        <td style="padding:12px 20px">
+          {% if u.is_active %}
+            <span style="font-size:.8rem;color:#16a34a"><i class="bi bi-circle-fill me-1" style="font-size:.5rem;vertical-align:middle"></i>正常</span>
+          {% else %}
+            <span style="font-size:.8rem;color:#dc2626"><i class="bi bi-circle-fill me-1" style="font-size:.5rem;vertical-align:middle"></i>已禁用</span>
+          {% endif %}
+        </td>
+        <td style="padding:10px 20px">
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <!-- 重置密码 -->
+            <a href="{{ url_for('user_reset', id=u.id) }}"
+               style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+                      border-radius:6px;border:1px solid var(--border);background:none;
+                      font-size:.8rem;color:var(--text2);text-decoration:none;cursor:pointer"
+               title="重置密码">
+              <i class="bi bi-key"></i> 重置密码</a>
+
+            <!-- 权限切换 -->
+            {% if u.id != current_user.id %}
+            <form method="post" action="{{ url_for('user_toggle_admin', id=u.id) }}" style="margin:0">
+              <button style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+                             border-radius:6px;border:1px solid var(--border);background:none;
+                             font-size:.8rem;color:var(--text2);cursor:pointer"
+                      title="{{ '取消管理员' if u.is_admin else '设为管理员' }}">
+                <i class="bi bi-shield{% if u.is_admin %}-fill{% endif %}"></i>
+                {{ '取消管理员' if u.is_admin else '设为管理员' }}
+              </button>
+            </form>
+
+            <!-- 启用 / 禁用 -->
+            <form method="post" action="{{ url_for('user_toggle_active', id=u.id) }}" style="margin:0"
+                  onsubmit="return confirm('{{ '确认禁用' if u.is_active else '确认启用' }}帐户「{{ u.username }}」？')">
+              <button style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+                             border-radius:6px;border:1px solid var(--border);background:none;
+                             font-size:.8rem;cursor:pointer;
+                             color:{{ '#dc2626' if u.is_active else '#16a34a' }}">
+                <i class="bi bi-{{ 'slash-circle' if u.is_active else 'check-circle' }}"></i>
+                {{ '禁用' if u.is_active else '启用' }}
+              </button>
+            </form>
+
+            <!-- 删除 -->
+            <form method="post" action="{{ url_for('user_delete', id=u.id) }}" style="margin:0"
+                  onsubmit="return confirm('确定删除用户「{{ u.username }}」？此操作不可恢复')">
+              <button style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+                             border-radius:6px;border:1px solid var(--border);background:none;
+                             font-size:.8rem;color:#dc2626;cursor:pointer">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

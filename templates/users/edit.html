@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ '重置密码' if reset else '新建用户' }} — SysAdmin Wiki{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('users_list') }}">用户管理</a></li>
+<li class="breadcrumb-item active">{{ '重置密码: ' + user.username if reset else '新建用户' }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h5 class="mb-0 fw-bold">{{ '重置密码 — ' + user.username if reset else '新建用户' }}</h5>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('users_list') }}" class="btn btn-sm btn-outline-secondary">取消</a>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-floppy"></i> 保存</button>
+  </div>
+</div>
+<div class="card" style="max-width:480px">
+  <div class="card-body">
+    {% if not reset %}
+    <div class="mb-3">
+      <label class="form-label fw-semibold">用户名 <span class="text-danger">*</span></label>
+      <input type="text" name="username" class="form-control"
+             placeholder="英文字母或数字" autocomplete="off" required>
+    </div>
+    {% endif %}
+    <div class="mb-3">
+      <label class="form-label fw-semibold">密码 <span class="text-danger">*</span></label>
+      <div class="input-group">
+        <input type="password" name="password" id="pwInput" class="form-control"
+               placeholder="至少 8 位" autocomplete="new-password" required>
+        <button type="button" class="btn btn-outline-secondary" onclick="togglePw()">
+          <i class="bi bi-eye" id="eyeBtn"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+function togglePw() {
+  const inp = document.getElementById('pwInput')
+  const ico = document.getElementById('eyeBtn')
+  inp.type = inp.type === 'password' ? 'text' : 'password'
+  ico.className = inp.type === 'text' ? 'bi bi-eye-slash' : 'bi bi-eye'
+}
+</script>
+{% endblock %}

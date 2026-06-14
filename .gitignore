@@ -1,0 +1,35 @@
+# Sensitive keys — never commit
+.secret_key
+.fernet_key
+
+# Database
+instance/
+*.db
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code session files
+.claude/

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}公司切换 — SysAdmin Wiki{% endblock %}
+
+{% block extra_style %}
+.ws-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:16px 20px;display:flex;align-items:center;gap:12px;
+  transition:border-color .12s,box-shadow .12s}
+.ws-card.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-border)}
+.ws-badge{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:1.1rem;background:var(--accent-light);color:var(--accent);flex-shrink:0}
+.ws-badge.active{background:var(--accent);color:#fff}
+.ws-name{font-weight:600;font-size:.95rem;color:var(--text)}
+.ws-meta{font-size:.75rem;color:var(--text-muted);margin-top:2px}
+.ws-actions{margin-left:auto;display:flex;align-items:center;gap:6px}
+{% endblock %}
+
+{% block content %}
+<div style="max-width:560px;margin:0 auto">
+  <h5 style="font-weight:700;margin-bottom:4px">公司切换</h5>
+  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:24px">
+    每个数据库完全隔离，密码和笔记互不干扰
+  </p>
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:28px">
+    {% for ws in workspaces %}
+    {% set is_active = (g.workspace and g.workspace.id == ws.id) %}
+    <div class="ws-card {{ 'active' if is_active }}">
+      <div class="ws-badge {{ 'active' if is_active }}">
+        <i class="bi bi-server"></i>
+      </div>
+      <div>
+        <div class="ws-name">{{ ws.name }}
+          {% if is_active %}
+          <span style="font-size:.7rem;color:var(--accent);font-weight:500;margin-left:6px">▶ 当前</span>
+          {% endif %}
+        </div>
+        <div class="ws-meta">创建于 {{ ws.created_at.strftime('%Y-%m-%d') }}</div>
+      </div>
+      <div class="ws-actions">
+        {% if not is_active %}
+        <form method="post" action="{{ url_for('workspace_switch', id=ws.id) }}" style="display:inline">
+          <button class="btn-primary-flat" style="font-size:.8rem;padding:5px 12px">切换</button>
+        </form>
+        {% endif %}
+        <!-- 置顶数量 -->
+        <form method="post" action="{{ url_for('workspace_set_max_pins', id=ws.id) }}"
+              style="display:inline-flex;align-items:center;gap:4px">
+          <i class="bi bi-pin" style="font-size:.8rem;color:var(--text-muted)"></i>
+          <input type="number" name="max_pins" value="{{ ws.max_pins }}" min="1" max="20"
+                 style="width:44px;border:1px solid var(--border);border-radius:6px;
+                        background:var(--input-bg);color:var(--text);font-size:.8rem;
+                        padding:3px 6px;text-align:center"
+                 title="置顶上限"
+                 onchange="this.form.submit()">
+        </form>
+        <!-- 重命名 -->
+        <button class="pa-btn" style="font-size:.85rem;border:1px solid var(--border);border-radius:6px"
+                onclick="showRename({{ ws.id }}, '{{ ws.name | e }}')">
+          <i class="bi bi-pencil"></i>
+        </button>
+        <!-- 删除 -->
+        {% if workspaces|length > 1 %}
+        <form method="post" action="{{ url_for('workspace_delete', id=ws.id) }}" style="display:inline"
+              onsubmit="return confirm('确认删除「{{ ws.name }}」？\n此操作不可恢复，请确保数据库已清空')">
+          <button class="pa-btn pa-del-btn" style="font-size:.85rem;border:1px solid var(--border);border-radius:6px">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- 新建数据库 -->
+  <div style="background:var(--surface2);border:1px dashed var(--border2);border-radius:12px;padding:20px">
+    <div style="font-weight:600;font-size:.9rem;margin-bottom:12px;color:var(--text2)">
+      <i class="bi bi-plus-circle me-2"></i>新建数据库
+    </div>
+    <form method="post" action="{{ url_for('workspace_create') }}" style="display:flex;gap:8px">
+      <input type="text" name="name" placeholder="数据库名称，如：A公司、B公司"
+             required maxlength="50"
+             style="flex:1;border:1px solid var(--border);border-radius:8px;
+                    padding:8px 12px;font-size:.875rem;background:var(--input-bg);color:var(--text)">
+      <button class="btn-primary-flat">创建并切换</button>
+    </form>
+  </div>
+</div>
+
+<!-- 重命名 Modal -->
+<div id="renameModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);
+  z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:14px;padding:24px 28px;
+              width:340px;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+    <div style="font-weight:700;margin-bottom:16px">重命名数据库</div>
+    <form id="renameForm" method="post">
+      <input id="renameInput" type="text" name="name" required maxlength="50"
+             style="width:100%;border:1px solid var(--border);border-radius:8px;
+                    padding:8px 12px;font-size:.875rem;background:var(--input-bg);
+                    color:var(--text);margin-bottom:14px">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" onclick="hideRename()"
+                style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);
+                       background:none;color:var(--text2);cursor:pointer">取消</button>
+        <button class="btn-primary-flat">确认</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+function showRename(id, name) {
+  document.getElementById('renameInput').value = name
+  document.getElementById('renameForm').action = `/workspaces/${id}/rename`
+  const m = document.getElementById('renameModal')
+  m.style.display = 'flex'
+  setTimeout(() => document.getElementById('renameInput').select(), 50)
+}
+function hideRename() {
+  document.getElementById('renameModal').style.display = 'none'
+}
+document.getElementById('renameModal').addEventListener('click', function(e) {
+  if (e.target === this) hideRename()
+})
+</script>
+{% endblock %}

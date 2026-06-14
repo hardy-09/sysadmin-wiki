@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+{% block title %}密码 — SysAdmin Wiki{% endblock %}
+
+{% block extra_style %}
+.pw-acts{display:inline-flex;align-items:center;gap:0;
+  opacity:0;pointer-events:none;
+  transition:opacity .12s ease;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:8px;padding:2px 3px;box-shadow:0 1px 5px rgba(0,0,0,.08)}
+.pw-row:hover .pw-acts,
+.pw-row.acts-open .pw-acts{opacity:1;pointer-events:all}
+.pa-btn{display:inline-flex;align-items:center;gap:1px;padding:3px 4px;border-radius:4px;
+  font-size:.85rem;cursor:pointer;border:none;background:none;
+  color:var(--text2);text-decoration:none;white-space:nowrap;
+  transition:background .07s,color .07s;line-height:1.4}
+.pa-btn:hover{background:var(--hover-bg);color:var(--text)}
+.pa-del-btn:hover{color:#dc2626}
+.pa-sep{width:1px;height:14px;background:var(--border);margin:0 2px;flex-shrink:0}
+.pa-cfm{display:none;align-items:center;gap:1px}
+.pw-row.editing{background:var(--accent-light)!important}
+.pw-row.editing td{padding-top:5px!important;padding-bottom:5px!important}
+.pw-icon{color:var(--text2)!important;transition:color .1s}
+.pw-icon:hover{color:var(--accent)!important}
+.pw-mask{font-family:monospace;letter-spacing:0;max-width:140px;white-space:nowrap;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;-webkit-mask-image:linear-gradient(to right,black 70%,transparent 100%);display:inline-block;vertical-align:middle}
+.pw-mask::-webkit-scrollbar{display:none}
+.host-clip{display:block;max-width:220px;white-space:nowrap;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;-webkit-mask-image:linear-gradient(to right,black 75%,transparent 100%)}
+.host-clip::-webkit-scrollbar{display:none}
+.pw-row.pinned{background:linear-gradient(90deg,var(--accent-light) 0%,transparent 60%)!important}
+.pw-row.pinned td:first-child{border-left:3px solid var(--accent)}
+.pw-row.pinned td{border-bottom:2px solid var(--accent-border)!important}
+.pa-pin-btn{color:var(--text-muted)!important}
+.pa-pin-btn.pinned{color:var(--accent)!important}
+.pa-pin-btn:hover{color:var(--accent)!important}
+.ei-sel.form-select{padding-right:1.2rem!important;background-position:right .25rem center!important;background-size:10px 8px!important}
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px">
+
+  <!-- 左：地区 + 分类筛选 -->
+  <div style="flex:1;min-width:0">
+    {% if regions %}
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;min-width:2.5rem">地区</span>
+      <a href="{{ url_for('passwords_list', category=current_category) }}"
+         class="tag {{ 'active' if not current_region }}">全部</a>
+      {% for reg, cnt in regions %}
+      <a href="{{ url_for('passwords_list', region=reg, category=current_category) }}"
+         class="tag {{ 'active' if current_region == reg }}">{{ reg }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;min-width:2.5rem">分类</span>
+      <a href="{{ url_for('passwords_list', region=current_region) }}"
+         class="tag {{ 'active' if not current_category }}">全部</a>
+      {% for cat, cnt in categories %}
+      <a href="{{ url_for('passwords_list', category=cat, region=current_region) }}"
+         class="tag {{ 'active' if current_category == cat }}">{{ cat }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 右：新增 -->
+  <div style="flex-shrink:0">
+    <button onclick="showNewRow()" class="btn-primary-flat">
+      <i class="bi bi-plus-lg me-1"></i>新增</button>
+  </div>
+
+</div>
+
+<div class="fc">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" style="font-size:.875rem">
+      <thead style="background:var(--surface2);border-bottom:1px solid var(--border)">
+        <tr>
+          <th style="padding:10px 16px;font-weight:600;color:var(--text-muted)">名称</th>
+          <th style="padding:10px 16px;font-weight:600;color:var(--text-muted)">地区</th>
+          <th style="padding:10px 16px;font-weight:600;color:var(--text-muted)">分类</th>
+          <th style="padding:10px 16px;font-weight:600;color:var(--text-muted)">类型</th>
+          <th style="padding:10px 16px;font-weight:600;color:var(--text-muted);min-width:180px">主机 / IP</th>
+          <th style="padding:10px 16px 10px 32px;font-weight:600;color:var(--text-muted);white-space:nowrap">帐户</th>
+          <th style="padding:10px 16px 10px 32px;font-weight:600;color:var(--text-muted)">密码</th>
+          <th style="width:120px;padding:10px 12px"></th>
+        </tr>
+      </thead>
+      <tbody id="pwBody">
+        {% for pw in passwords %}
+        <tr class="pw-row{% if pw.pin_order %} pinned{% endif %}" data-id="{{ pw.id }}"
+            data-name="{{ pw.name }}"
+            data-cat="{{ pw.category }}"
+            data-region="{{ pw.region }}"
+            data-host="{{ pw.host }}"
+            data-port="{{ pw.port }}"
+            data-user="{{ pw.username }}"
+            data-type="{{ pw.conn_type }}">
+
+          <td style="padding:10px 16px;max-width:180px">
+            <a href="{{ url_for('password_view', id=pw.id) }}"
+               class="fw-medium text-decoration-none host-clip" style="color:var(--text)"
+               title="{{ pw.name }}">{{ pw.name }}</a>
+          </td>
+
+          <td style="padding:10px 16px">
+            {% if pw.region %}<span class="tag">{{ pw.region }}</span>{% else %}—{% endif %}
+          </td>
+
+          <td style="padding:10px 16px"><span class="tag">{{ pw.category }}</span></td>
+
+          <td style="padding:10px 16px">
+            {% if pw.conn_type == 'ssh' %}
+              <span class="tag" style="cursor:pointer"
+                    onclick="quickCopy('ssh','{{ pw.host }}','{{ pw.port }}','{{ pw.username }}',{{ pw.id }})"
+                    id="qc-{{ pw.id }}" title="复制 SSH 命令">
+                SSH</span>
+            {% elif pw.conn_type == 'web' %}
+              <span class="tag" style="cursor:pointer"
+                    onclick="quickCopy('web','{{ pw.host }}','{{ pw.port }}','{{ pw.username }}',{{ pw.id }})"
+                    id="qc-{{ pw.id }}" title="复制 Web 地址">
+                Web</span>
+            {% elif pw.conn_type == 'rdp' %}
+              <span class="tag" style="cursor:pointer"
+                    onclick="quickCopy('rdp','{{ pw.host }}','{{ pw.port }}','{{ pw.username }}',{{ pw.id }})"
+                    id="qc-{{ pw.id }}" title="复制 RDP 地址">
+                RDP</span>
+            {% else %}—{% endif %}
+          </td>
+
+          <td style="padding:10px 16px;white-space:nowrap">
+            {% if pw.conn_type == 'web' %}
+              <a href="{{ ('https://' if not pw.host.startswith('http') else '') + pw.host + (':' + pw.port if pw.port else '') }}"
+                 target="_blank" rel="noopener"
+                 class="host-clip"
+                 style="color:var(--accent);text-decoration:none"
+                 title="{{ pw.host }}{% if pw.port %}:{{ pw.port }}{% endif %}"
+                 onmouseover="this.style.textDecoration='underline'"
+                 onmouseout="this.style.textDecoration='none'">
+                {{ pw.host }}{% if pw.port %}:{{ pw.port }}{% endif %}
+              </a>
+            {% else %}
+              <span class="host-clip" style="color:var(--text)"
+                    title="{{ pw.host }}{% if pw.port %}:{{ pw.port }}{% endif %}">
+                {{ pw.host }}{% if pw.port %}:{{ pw.port }}{% endif %}
+              </span>
+            {% endif %}
+          </td>
+
+          <td style="padding:10px 16px 10px 32px;white-space:nowrap">{{ pw.username or '—' }}</td>
+
+          <td style="padding:10px 16px 10px 32px">
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="btn btn-sm btn-link p-0 pw-icon flex-shrink-0"
+                      onclick="togglePw({{ pw.id }},this)"><i class="bi bi-eye"></i></button>
+              <span class="pw-mask" id="pw-{{ pw.id }}" style="flex:1;max-width:none">••••••••</span>
+              <button class="btn btn-sm btn-link p-0 pw-icon flex-shrink-0"
+                      onclick="copyPw({{ pw.id }})"><i class="bi bi-clipboard" id="clip-{{ pw.id }}"></i></button>
+            </div>
+          </td>
+
+          <td style="padding:6px 12px;position:relative">
+            <div class="pw-acts">
+              <button class="pa-btn pa-pin-btn {% if pw.pin_order %}pinned{% endif %}"
+                      onclick="pinRow({{ pw.id }}, this)"
+                      title="{{ '取消置顶' if pw.pin_order else '置顶' }}">
+                <i class="bi bi-pin{% if pw.pin_order %}-fill{% endif %}"></i></button>
+              <span class="pa-sep"></span>
+              <button class="pa-btn" onclick="paEditClick(this)">
+                <i class="bi bi-pencil"></i></button>
+              <span class="pa-sep"></span>
+              <button class="pa-btn" onclick="paDupClick({{ pw.id }})" title="复制此行">
+                <i class="bi bi-copy"></i></button>
+              <span class="pa-sep"></span>
+              <button class="pa-btn pa-del-btn" onclick="paDelClick(this)">
+                <i class="bi bi-trash"></i></button>
+              <span class="pa-cfm">
+                <button class="pa-btn" style="color:#dc2626"
+                        onclick="paDelConfirm({{ pw.id }}, this)">✓</button>
+                <button class="pa-btn" onclick="paDelCancel(this)">✕</button>
+              </span>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr id="emptyRow">
+          <td colspan="8" class="text-center py-4"
+              style="color:var(--text-muted);font-style:italic;font-size:.875rem">
+            暂无记录，点击右上角「新增」添加
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<datalist id="catList">
+  {% for cat, _ in categories %}<option value="{{ cat }}">{% endfor %}
+</datalist>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+/* ── Category / Region lists from server ────────────────────── */
+const CATS    = [{% for cat, _ in categories %}"{{ cat | e }}"{% if not loop.last %},{% endif %}{% endfor %}];
+const REGIONS = [{% for reg, _ in regions %}"{{ reg | e }}"{% if not loop.last %},{% endif %}{% endfor %}];
+
+/* ── Category select helper ──────────────────────────────────── */
+// Builds a <select> with existing categories + "＋ 新建" at the bottom.
+// Appends a hidden text input that appears when "新建" is chosen.
+function buildCatSelect(selId, newId, current) {
+  let opts = ''
+  let hasCurrent = false
+  for (const c of CATS) {
+    const sel = c === current ? ' selected' : ''
+    if (sel) hasCurrent = true
+    opts += `<option value="${eiEsc(c)}"${sel}>${eiEsc(c)}</option>`
+  }
+  // If current value isn't in the list yet, add it at top
+  if (current && !hasCurrent && current !== '__new__') {
+    opts = `<option value="${eiEsc(current)}" selected>${eiEsc(current)}</option>` + opts
+  }
+  // Default "未分类" if list is empty
+  if (!CATS.length && !current) {
+    opts = '<option value="未分类" selected>未分类</option>'
+  }
+  opts += `<option value="__new__">＋ 新建分类…</option>`
+  return `<div>
+    <select id="${selId}" class="form-select form-select-sm ei-sel" style="min-width:72px;max-width:72px" onchange="catSelChange(this)">
+      ${opts}
+    </select>
+    <input id="${newId}" class="form-control form-control-sm mt-1"
+           placeholder="输入新分类名" style="display:none">
+  </div>`
+}
+
+function catSelChange(sel) {
+  const inp = document.getElementById(sel.id.replace('-sel', '') + '-new') ||
+              sel.closest('div').querySelector('input')
+  if (!inp) return
+  if (sel.value === '__new__') { inp.style.display = ''; inp.focus() }
+  else inp.style.display = 'none'
+}
+
+function getCat(selId, newId) {
+  const sel = document.getElementById(selId)
+  if (!sel) return '未分类'
+  if (sel.value === '__new__') {
+    const inp = document.getElementById(newId)
+    return (inp && inp.value.trim()) || '未分类'
+  }
+  return sel.value || '未分类'
+}
+
+/* ── Region select helper ────────────────────────────────────── */
+function buildRegionSelect(selId, newId, current) {
+  let opts = `<option value=""${!current ? ' selected' : ''}>— 无 —</option>`
+  let hasCurrent = !current
+  for (const r of REGIONS) {
+    const sel = r === current ? ' selected' : ''
+    if (sel) hasCurrent = true
+    opts += `<option value="${eiEsc(r)}"${sel}>${eiEsc(r)}</option>`
+  }
+  if (current && !hasCurrent && current !== '__new__') {
+    opts += `<option value="${eiEsc(current)}" selected>${eiEsc(current)}</option>`
+  }
+  opts += `<option value="__new__">＋ 新建地区…</option>`
+  return `<div>
+    <select id="${selId}" class="form-select form-select-sm ei-sel" style="min-width:72px;max-width:72px" onchange="regionSelChange(this)">
+      ${opts}
+    </select>
+    <input id="${newId}" class="form-control form-control-sm mt-1"
+           placeholder="输入新地区名" style="display:none">
+  </div>`
+}
+
+function regionSelChange(sel) {
+  const inp = sel.closest('div').querySelector('input')
+  if (!inp) return
+  if (sel.value === '__new__') { inp.style.display = ''; inp.focus() }
+  else inp.style.display = 'none'
+}
+
+function getRegion(selId, newId) {
+  const sel = document.getElementById(selId)
+  if (!sel) return ''
+  if (sel.value === '__new__') {
+    const inp = document.getElementById(newId)
+    return (inp && inp.value.trim()) || ''
+  }
+  return sel.value || ''
+}
+
+/* ── Helpers ─────────────────────────────────────────────────── */
+function eiEsc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+function parseHostPort(v) {
+  v = (v || '').trim()
+  const m = v.match(/^(.*?)\s+(\d{1,5})\s*$/)
+  return m ? {host: m[1].trim(), port: m[2]} : {host: v, port: ''}
+}
+
+/* ── Delete ──────────────────────────────────────────────────── */
+function paDelClick(btn) {
+  const acts = btn.closest('.pw-acts')
+  acts.closest('tr').classList.add('acts-open')
+  btn.previousElementSibling.style.display = 'none'
+  btn.style.display = 'none'
+  acts.querySelector('.pa-cfm').style.display = 'inline-flex'
+}
+function paDelCancel(btn) {
+  const acts = btn.closest('.pw-acts')
+  acts.closest('tr').classList.remove('acts-open')
+  acts.querySelector('.pa-cfm').style.display = 'none'
+  const del = acts.querySelector('.pa-del-btn')
+  del.style.display = ''
+  del.previousElementSibling.style.display = ''
+}
+async function paDelConfirm(id, btn) {
+  const row = btn.closest('tr')
+  const res = await fetch('/passwords/' + id + '/delete', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+  })
+  if (res.ok) {
+    row.remove()
+    const cnt = document.getElementById('pwCount')
+    if (cnt) cnt.textContent = document.querySelectorAll('.pw-row[data-id]').length + ' 条记录'
+    if (!document.querySelectorAll('.pw-row[data-id]').length) {
+      const e = document.getElementById('emptyRow'); if (e) e.style.display = ''
+    }
+  }
+}
+
+/* ── Duplicate row ───────────────────────────────────────────── */
+function dupName(base) {
+  // 去掉已有的 -副本N 后缀，找到原始名称
+  const m = base.match(/^(.*)-副本\d+$/)
+  const root = m ? m[1].trimEnd() : base
+  // 收集页面上所有已有名称
+  const existing = new Set([...document.querySelectorAll('.pw-row[data-id]')].map(r => r.dataset.name))
+  let i = 1
+  while (existing.has(`${root}-副本${i}`)) i++
+  return `${root}-副本${i}`
+}
+async function paDupClick(id) {
+  const row = document.querySelector(`tr[data-id="${id}"]`)
+  if (!row) return
+  const pwRes = await fetch('/passwords/' + id + '/reveal')
+  const pw = (await pwRes.json()).password
+  const res = await fetch('/passwords/new', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      name:      dupName(row.dataset.name || ''),
+      username:  row.dataset.user     || '',
+      password:  pw,
+      host:      row.dataset.host     || '',
+      port:      row.dataset.port     || '',
+      conn_type: row.dataset.type     || '',
+      category:  row.dataset.cat      || '',
+      region:    row.dataset.region   || '',
+    })
+  })
+  if (res.ok) { window.location.reload() }
+  else { alert('复制失败') }
+}
+
+/* ── Inline edit ─────────────────────────────────────────────── */
+function paEditClick(btn) {
+  const row = btn.closest('tr')
+  if (row.classList.contains('editing')) return
+
+  const cells = [...row.querySelectorAll('td')]
+  row.dataset.backup = JSON.stringify(cells.map(c => c.innerHTML))
+
+  const id     = row.dataset.id
+  const name   = row.dataset.name   || ''
+  const cat    = row.dataset.cat    || ''
+  const region = row.dataset.region || ''
+  const host   = row.dataset.host   || ''
+  const port   = row.dataset.port   || ''
+  const user   = row.dataset.user   || ''
+  const type   = row.dataset.type   || ''
+
+  cells[0].innerHTML =
+    `<input id="ei-name" class="form-control form-control-sm" value="${eiEsc(name)}" style="min-width:100px">`
+
+  cells[1].innerHTML = buildRegionSelect('ei-region', 'ei-region-new', region)
+
+  cells[2].innerHTML = buildCatSelect('ei-cat', 'ei-cat-new', cat)
+
+  cells[3].innerHTML =
+    `<select id="ei-type" class="form-select form-select-sm ei-sel" style="min-width:68px;max-width:68px">
+       <option value="">— 无 —</option>
+       <option value="ssh"${type==='ssh'?' selected':''}>SSH</option>
+       <option value="web"${type==='web'?' selected':''}>Web</option>
+       <option value="rdp"${type==='rdp'?' selected':''}>RDP</option>
+     </select>`
+
+  const hpVal = host + (port ? ' ' + port : '')
+  cells[4].innerHTML =
+    `<input id="ei-hp" class="form-control form-control-sm" value="${eiEsc(hpVal)}" placeholder="主机/IP" style="width:100%">`
+
+  cells[5].innerHTML =
+    `<input id="ei-user" class="form-control form-control-sm" value="${eiEsc(user)}" autocomplete="off" style="min-width:80px;width:80px">`
+
+  cells[6].innerHTML =
+    `<input type="text" id="ei-pw" class="form-control form-control-sm"
+            placeholder="留空不修改" autocomplete="off"
+            style="width:calc(100% + 40px);margin-left:-28px;font-family:monospace">`
+
+  cells[7].querySelector('.pw-acts').innerHTML =
+    `<button class="pa-btn" style="color:var(--accent);padding:4px 6px;font-size:.8rem" onclick="paEditSave('${id}')">
+       <i class="bi bi-floppy"></i></button>
+     <span class="pa-sep"></span>
+     <button class="pa-btn" style="padding:4px 6px;font-size:.8rem" onclick="paEditCancel('${id}')">✕</button>`
+
+  row.classList.add('acts-open', 'editing')
+  document.getElementById('ei-name').focus()
+}
+
+function toggleEiPw() {
+  const inp = document.getElementById('ei-pw'), ico = document.getElementById('ei-eye')
+  if (inp.type === 'password') { inp.type = 'text'; ico.className = 'bi bi-eye-slash' }
+  else { inp.type = 'password'; ico.className = 'bi bi-eye' }
+}
+function paEditCancel(id) {
+  const row = document.querySelector(`tr[data-id="${id}"]`)
+  if (!row) return
+  const backup = JSON.parse(row.dataset.backup || '[]')
+  row.querySelectorAll('td').forEach((c, i) => { if (backup[i] != null) c.innerHTML = backup[i] })
+  row.classList.remove('acts-open', 'editing')
+  delete row.dataset.backup
+}
+async function paEditSave(id) {
+  const name = document.getElementById('ei-name').value.trim()
+  if (!name) { document.getElementById('ei-name').focus(); return }
+  const row = document.querySelector(`tr[data-id="${id}"]`)
+  const saveBtn = row.querySelector('.pa-btn')
+  saveBtn.innerHTML = '保存中…'; saveBtn.disabled = true
+  try {
+    const res = await fetch('/passwords/' + id + '/edit', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        name,
+        region:    getRegion('ei-region', 'ei-region-new'),
+        category:  getCat('ei-cat', 'ei-cat-new'),
+        ...parseHostPort(document.getElementById('ei-hp').value),
+        conn_type: document.getElementById('ei-type').value,
+        username:  document.getElementById('ei-user').value.trim(),
+        password:  document.getElementById('ei-pw').value,
+      })
+    })
+    if (res.ok) { window.location.reload() }
+    else {
+      const d = await res.json().catch(() => ({}))
+      alert(d.error || '保存失败')
+      saveBtn.innerHTML = '<i class="bi bi-floppy me-1"></i>保存'; saveBtn.disabled = false
+    }
+  } catch {
+    alert('网络错误')
+    saveBtn.innerHTML = '<i class="bi bi-floppy me-1"></i>保存'; saveBtn.disabled = false
+  }
+}
+
+/* ── Inline new row ──────────────────────────────────────────── */
+function showNewRow() {
+  if (document.getElementById('newRow')) return
+  const empty = document.getElementById('emptyRow')
+  if (empty) empty.style.display = 'none'
+
+  const tr = document.createElement('tr')
+  tr.id = 'newRow'
+  tr.style.cssText = 'outline:2px solid var(--accent,#4f8ef7);outline-offset:-1px'
+  tr.innerHTML = `
+    <td style="padding:6px 10px">
+      <input id="nr-name" class="form-control form-control-sm" placeholder="名称 *" onkeydown="nrKey(event)">
+    </td>
+    <td style="padding:6px 10px">
+      ${buildRegionSelect('nr-region', 'nr-region-new', '')}
+    </td>
+    <td style="padding:6px 10px">
+      ${buildCatSelect('nr-cat', 'nr-cat-new', '')}
+    </td>
+    <td style="padding:6px 10px">
+      <select id="nr-type" class="form-select form-select-sm" style="min-width:80px">
+        <option value="">— 无 —</option>
+        <option value="ssh">SSH</option>
+        <option value="web">Web</option>
+        <option value="rdp">RDP</option>
+      </select>
+    </td>
+    <td style="padding:6px 10px">
+      <input id="nr-hp" class="form-control form-control-sm" placeholder="主机/IP 端口" onkeydown="nrKey(event)">
+    </td>
+    <td style="padding:6px 10px">
+      <input id="nr-user" class="form-control form-control-sm" placeholder="用户名"
+             onkeydown="nrKey(event)" autocomplete="off">
+    </td>
+    <td style="padding:6px 10px">
+      <div class="input-group input-group-sm">
+        <input type="password" id="nr-pw" class="form-control form-control-sm" placeholder="密码"
+               onkeydown="nrKey(event)" autocomplete="new-password">
+        <button type="button" class="btn btn-outline-secondary" onclick="toggleNrPw()" tabindex="-1"
+                style="padding:0 8px"><i class="bi bi-eye" id="nr-eye"></i></button>
+      </div>
+    </td>
+    <td style="padding:6px 10px">
+      <div class="d-flex gap-2">
+        <button id="nr-save" onclick="saveNewRow()" class="btn-primary-flat"
+                style="font-size:.75rem;padding:3px 10px">保存</button>
+        <button onclick="cancelNewRow()" class="btn-flat"
+                style="font-size:.75rem;padding:3px 8px">✕</button>
+      </div>
+    </td>`
+  document.getElementById('pwBody').insertBefore(tr, document.getElementById('pwBody').firstChild)
+  document.getElementById('nr-name').focus()
+}
+
+function cancelNewRow() {
+  const tr = document.getElementById('newRow'); if (tr) tr.remove()
+  const e = document.getElementById('emptyRow')
+  if (e && !document.querySelectorAll('.pw-row[data-id]').length) e.style.display = ''
+}
+function toggleNrPw() {
+  const inp = document.getElementById('nr-pw'), ico = document.getElementById('nr-eye')
+  if (inp.type === 'password') { inp.type = 'text'; ico.className = 'bi bi-eye-slash' }
+  else { inp.type = 'password'; ico.className = 'bi bi-eye' }
+}
+function nrKey(e) {
+  if (e.key === 'Enter')  { e.preventDefault(); saveNewRow() }
+  if (e.key === 'Escape') { e.preventDefault(); cancelNewRow() }
+}
+async function saveNewRow() {
+  const name = document.getElementById('nr-name').value.trim()
+  if (!name) { document.getElementById('nr-name').focus(); return }
+  const btn = document.getElementById('nr-save')
+  btn.textContent = '保存中…'; btn.disabled = true
+  try {
+    const res = await fetch('/passwords/new', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        name,
+        region:    getRegion('nr-region', 'nr-region-new'),
+        ...parseHostPort(document.getElementById('nr-hp').value),
+        username:  document.getElementById('nr-user').value.trim(),
+        password:  document.getElementById('nr-pw').value,
+        category:  getCat('nr-cat', 'nr-cat-new'),
+        conn_type: document.getElementById('nr-type').value,
+      })
+    })
+    if (res.ok) { window.location.reload() }
+    else {
+      const d = await res.json().catch(() => ({}))
+      alert(d.error || '保存失败')
+      btn.textContent = '保存'; btn.disabled = false
+    }
+  } catch { alert('网络错误'); btn.textContent = '保存'; btn.disabled = false }
+}
+
+/* ── Password reveal / copy ─────────────────────────────────── */
+async function quickCopy(type, host, port, user, id) {
+  let text = ''
+  if (type === 'ssh') {
+    text = 'ssh ' + user + '@' + host
+    if (port && port !== '22') text += ' -p ' + port
+  } else if (type === 'web') {
+    const proto = port === '443' ? 'https' : 'http'
+    text = proto + '://' + host
+    if (port && port !== '80' && port !== '443') text += ':' + port
+  } else {
+    text = host; if (port && port !== '3389') text += ':' + port
+  }
+  if (!text) return
+  await navigator.clipboard.writeText(text)
+  const icon = document.getElementById('qc-' + id), orig = icon.className
+  icon.className = 'bi bi-check-lg text-success'
+  setTimeout(() => icon.className = orig, 1500)
+}
+
+const cache = {}
+async function fetchPw(id) {
+  if (!cache[id]) { const r = await fetch('/passwords/'+id+'/reveal'); cache[id]=(await r.json()).password }
+  return cache[id]
+}
+async function togglePw(id, btn) {
+  const el = document.getElementById('pw-' + id)
+  if (el.dataset.shown === '1') {
+    el.textContent = '••••••••'; el.dataset.shown = '0'; btn.querySelector('i').className = 'bi bi-eye'
+  } else {
+    el.textContent = await fetchPw(id); el.dataset.shown = '1'; btn.querySelector('i').className = 'bi bi-eye-slash'
+  }
+}
+async function pinRow(id, btn) {
+  await fetch(`/passwords/${id}/pin`, {method:'POST'})
+  location.reload()
+}
+async function copyPw(id) {
+  await navigator.clipboard.writeText(await fetchPw(id))
+  const icon = document.getElementById('clip-' + id)
+  icon.className = 'bi bi-check-lg text-success'
+  setTimeout(() => icon.className = 'bi bi-clipboard', 1500)
+}
+</script>
+{% endblock %}
