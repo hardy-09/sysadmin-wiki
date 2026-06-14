@@ -31,5 +31,8 @@ Thumbs.db
 *.swp
 *.swo
 
+# Private modules
+templates/passwords/
+
 # Claude Code session files
 .claude/
